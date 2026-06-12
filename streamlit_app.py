@@ -4,6 +4,7 @@ import re
 
 # 1. THE CHORD ENGINE (Mathematical Voicing)
 def calculate_voicing(chord_str):
+    """Calculates a 4-to-5 note piano voicing for ANY given chord string."""
     SVG_NOTES = ["C", "C#", "D", "Eb", "E", "F", "F#", "G", "G#", "A", "Bb", "B"]
     
     def get_note_index(note_name):
@@ -11,11 +12,13 @@ def calculate_voicing(chord_str):
                    'F#':6, 'Gb':6, 'G':7, 'G#':8, 'Ab':8, 'A':9, 'A#':10, 'Bb':10, 'B':11}
         return mapping.get(note_name, 0)
 
+    # Clean the chord string: Remove anything inside parentheses for the calculation
     calc_chord = re.sub(r'\(.*?\)', '', chord_str)
     parts = calc_chord.split('/')
     base_chord = parts[0]
     bass_note = parts[1] if len(parts) > 1 else None
 
+    # Extract Root and Quality
     match = re.match(r"^([A-G][b#]?)(.*)", base_chord)
     if not match: return []
     
@@ -23,6 +26,7 @@ def calculate_voicing(chord_str):
     quality = match.group(2).lower()
     root_idx = get_note_index(root_note)
 
+    # Calculate Intervals
     intervals = set([0]) 
     if 'm' in quality and 'maj' not in quality: intervals.add(3)
     elif 'sus2' in quality: intervals.add(2)
@@ -83,18 +87,31 @@ if uploaded_file:
     if col1.button("Previous"): st.session_state.step = max(0, st.session_state.step - 1)
     if col2.button("Next"): st.session_state.step = min(len(sequence)-1, st.session_state.step + 1)
     
-    data = sequence[st.session_state.step]
-    st.markdown(f"### {data['lyric']}")
-    st.markdown(f"## {data['chord']}")
-    
-    # SVG PIANO
-    active = data['keys']
-    svg = ['<svg width="100%" height="150" style="border:1px solid #ccc; background:#fff;">']
-    x = 0
-    for oct in ["2", "3", "4"]:
-        for n in ["C", "D", "E", "F", "G", "A", "B"]:
-            f = "lightblue" if f"{n}{oct}" in active else "white"
-            svg.append(f'<rect x="{x}" y="0" width="40" height="150" fill="{f}" stroke="black" />')
-            x += 40
-    svg.append('</svg>')
-    st.write("".join(svg), unsafe_allow_html=True)
+    if sequence:
+        data = sequence[st.session_state.step]
+        st.markdown(f"### {data['lyric']}")
+        st.markdown(f"## {data['chord']} <span style='font-size: 14px; font-weight: normal; color: #888;'>({st.session_state.step + 1}/{len(sequence)})</span>", unsafe_allow_html=True)
+        
+        # SVG PIANO (With corrected layering)
+        active = data['keys']
+        svg = ['<svg width="100%" height="150" style="border:1px solid #ccc; background:#fff;">']
+        
+        # 1. White keys
+        x = 0
+        for oct in ["2", "3", "4"]:
+            for n in ["C", "D", "E", "F", "G", "A", "B"]:
+                f = "lightblue" if f"{n}{oct}" in active else "white"
+                svg.append(f'<rect x="{x}" y="0" width="40" height="150" fill="{f}" stroke="black" stroke-width="1" />')
+                x += 40
+        
+        # 2. Black keys (drawn last to sit on top)
+        black_offsets = {"C#": 30, "Eb": 70, "F#": 150, "G#": 190, "Bb": 230}
+        x_start = 0
+        for oct in ["2", "3", "4"]:
+            for note, offset in black_offsets.items():
+                f = "lightblue" if f"{note}{oct}" in active else "black"
+                svg.append(f'<rect x="{x_start + offset}" y="0" width="25" height="90" fill="{f}" stroke="black" stroke-width="1" />')
+            x_start += 280
+            
+        svg.append('</svg>')
+        st.write("".join(svg), unsafe_allow_html=True)
